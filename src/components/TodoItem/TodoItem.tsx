@@ -2,14 +2,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Todo } from '../../types/Todo';
 import cn from 'classnames';
-import { TodoServiceErrors } from '../../types/Errors';
+import { TodoServiceErrors, TodoServiceErrorsValues } from '../../types/Errors';
 
 interface Props {
   todo: Todo;
   deleteTodo: (todoId: number) => Promise<void>;
   isLoading?: boolean;
   onSubmit: (value: Todo, shouldRefocus?: boolean) => Promise<void>;
-  setErrorMessage: (error: string | null) => void;
+  setErrorMessage: (error: TodoServiceErrorsValues | null) => void;
 }
 
 export const TodoItem: React.FC<Props> = ({

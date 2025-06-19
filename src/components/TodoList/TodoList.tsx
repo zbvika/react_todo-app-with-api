@@ -1,6 +1,7 @@
 import React from 'react';
 import { Todo } from '../../types/Todo';
 import { TodoItem } from '../TodoItem';
+import { TodoServiceErrorsValues } from '../../types/Errors';
 
 interface Props {
   todos: Todo[];
@@ -8,7 +9,7 @@ interface Props {
   tempTodo: Todo | null;
   onSubmit: (value: Todo, shouldRefocus?: boolean) => Promise<void>;
   todosInProgress: number[];
-  setErrorMessage: (error: string | null) => void;
+  setErrorMessage: (error: TodoServiceErrorsValues | null) => void;
 }
 
 /* eslint-disable jsx-a11y/label-has-associated-control */

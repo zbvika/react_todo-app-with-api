@@ -1,12 +1,25 @@
 import cn from 'classnames';
-import React from 'react';
+import React, { useEffect } from 'react';
+import { TodoServiceErrorsValues } from '../../types/Errors';
 
 interface Props {
   errorMessage: string | null;
-  setErrorMessage: (error: string | null) => void;
+  setErrorMessage: (error: TodoServiceErrorsValues | null) => void;
 }
 
 export const Error: React.FC<Props> = ({ errorMessage, setErrorMessage }) => {
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => {
+        setErrorMessage(null);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+
+    return;
+  }, [errorMessage]);
+
   return (
     <div
       data-cy="ErrorNotification"

@@ -2,16 +2,14 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { UserWarning } from './UserWarning';
 import { USER_ID } from './api/todos';
-import { TitleForm } from './components/TitleForm';
 import { TodoList } from './components/TodoList';
-import { ClearCompletedButton } from './components/ClearCompletedButton';
-import { useTodosFilter } from './hooks/useTodosFilter';
 import { useTodo } from './hooks/useTodo';
 import { Error } from './components/Error';
-import { TodoFilter } from './components/TodoFilter';
 import { ToggleAllButton } from './components/ToggleAllButton';
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { Todo } from './types/Todo';
+import { TodoForm } from './components/TitleForm';
+import { TodoFooter } from './components/TodoFooter';
 
 export const App: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -21,7 +19,7 @@ export const App: React.FC = () => {
     isLoading,
     errorMessage,
     tempTodo,
-    todosInProgress,
+    todoIdsInProgress,
     hasCompletedTodos,
     hasActiveTodos,
     setErrorMessage,
@@ -30,13 +28,21 @@ export const App: React.FC = () => {
     deleteCompletedTodos,
     updateTodo,
     toggleTodos,
+    visibleTodos,
+    filter,
+    setFilter,
+    countOfActiveTodos,
   } = useTodo();
 
-  const { visibleTodos, filter, setFilter, countOfActiveTodos } =
-    useTodosFilter(todos);
+  const isTodoListNotEmpty = useMemo(() => todos.length > 0, [todos]);
+  const isTodoInProgressNotEmpty = useMemo(
+    () => todoIdsInProgress.length > 0,
+    [todoIdsInProgress],
+  );
 
-  const isTodoListNotEmpty = todos.length > 0;
-  const isTodoInProgressNotEmpty = todosInProgress.length > 0;
+  const isFooterVisible = useMemo(() => {
+    return isTodoListNotEmpty && !isLoading;
+  }, [isTodoListNotEmpty, isLoading]);
 
   const handleDeleteTodo = (todoId: number) => {
     return deleteTodo(todoId).then(() => {
@@ -76,7 +82,7 @@ export const App: React.FC = () => {
             />
           )}
 
-          <TitleForm
+          <TodoForm
             ref={inputRef}
             onSubmit={addTodo}
             setErrorMessage={setErrorMessage}
@@ -89,25 +95,19 @@ export const App: React.FC = () => {
             deleteTodo={handleDeleteTodo}
             tempTodo={tempTodo}
             onSubmit={handleUpdateTodo}
-            todosInProgress={todosInProgress}
+            todosInProgress={todoIdsInProgress}
             setErrorMessage={setErrorMessage}
           />
         )}
 
-        {isTodoListNotEmpty && !isLoading && (
-          <footer className="todoapp__footer" data-cy="Footer">
-            <span className="todo-count" data-cy="TodosCounter">
-              {countOfActiveTodos} items left
-            </span>
-
-            <TodoFilter setFilter={setFilter} filter={filter} />
-
-            <ClearCompletedButton
-              countOfActiveTodos={countOfActiveTodos}
-              deleteCompletedTodos={handleDeleteCompletedTodos}
-              hasCompletedTodos={hasCompletedTodos}
-            />
-          </footer>
+        {isFooterVisible && (
+          <TodoFooter
+            setFilter={setFilter}
+            filter={filter}
+            deleteCompletedTodos={handleDeleteCompletedTodos}
+            hasCompletedTodos={hasCompletedTodos}
+            countOfActiveTodos={countOfActiveTodos}
+          />
         )}
       </div>
 

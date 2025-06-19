@@ -1,26 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as todoService from '../api/todos';
 import { Todo } from '../types/Todo';
-import { TodoServiceErrors } from '../types/Errors';
+import { TodoServiceErrors, TodoServiceErrorsValues } from '../types/Errors';
+import { FilterType, FilterTypeValues } from '../types/FilterType';
+import { getVisibleTodos } from '../utils/getVisibleTodos';
 
 export function useTodo() {
   const [data, setData] = useState<Todo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] =
+    useState<TodoServiceErrorsValues | null>(null);
   const [tempTodo, setTempTodo] = useState<Todo | null>(null);
-  const [todosInProgress, setTodosInProgress] = useState<number[]>([]);
+  const [todoIdsInProgress, setTodoIdsInProgress] = useState<number[]>([]);
 
-  useEffect(() => {
-    if (errorMessage) {
-      const timer = setTimeout(() => {
-        setErrorMessage(null);
-      }, 3000);
+  const [filter, setFilter] = useState<FilterTypeValues>(FilterType.All);
+  const visibleTodos: Todo[] = getVisibleTodos(data, filter);
 
-      return () => clearTimeout(timer);
-    }
-
-    return;
-  }, [errorMessage]);
+  const countOfActiveTodos = data.filter(todo => !todo.completed).length;
 
   useEffect(() => {
     setIsLoading(true);
@@ -32,23 +28,36 @@ export function useTodo() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const deleteTodo = (todoId: number) => {
-    setTodosInProgress([todoId]);
+  // #region deleteTodo
 
-    return todoService
-      .deleteTodos(todoId)
-      .then(() => setData(prev => prev.filter(todo => todo.id !== todoId)))
-      .catch(() => {
-        setErrorMessage(TodoServiceErrors.UnableToDelete);
-        throw new Error(TodoServiceErrors.UnableToDelete);
-      })
-      .finally(() => setTodosInProgress([]));
-  };
+  const deleteTodo = useCallback(
+    (todoId: number) => {
+      setTodoIdsInProgress([todoId]);
+
+      return todoService
+        .deleteTodos(todoId)
+        .then(() => {
+          setData(prev => prev.filter(todo => todo.id !== todoId));
+        })
+        .catch(() => {
+          setErrorMessage(TodoServiceErrors.UnableToDelete);
+          throw new Error(TodoServiceErrors.UnableToDelete);
+        })
+        .finally(() => {
+          setTodoIdsInProgress([]);
+        });
+    },
+    [setData, setErrorMessage, setTodoIdsInProgress],
+  );
+
+  // #endregion
 
   const hasCompletedTodos = data.some(todo => todo.completed);
-  const hasActiveTodos = data.some(todo => !todo.completed);
 
-  const deleteCompletedTodos = () => {
+  // #region deleteCompletedTodos
+  const hasActiveTodos = countOfActiveTodos > 0;
+
+  const deleteCompletedTodos = useCallback(() => {
     const completedIds = data
       .filter(todo => todo.completed)
       .map(todo => todo.id);
@@ -57,12 +66,9 @@ export function useTodo() {
       return Promise.resolve();
     }
 
-    setTodosInProgress(completedIds);
+    setTodoIdsInProgress(completedIds);
 
     return Promise.allSettled(
-      //передаємо в проміс масив айдішників, кожен з яких пропускаємо через функцію видалення
-      //після кожного видалення ми повертаємо ай ді вже із статусом (успішне чи ні)
-      //і масив результатів передаємо до промісу)
       completedIds.map(id => todoService.deleteTodos(id).then(() => id)),
     )
       .then(results => {
@@ -79,49 +85,56 @@ export function useTodo() {
         setData(prev => prev.filter(todo => !successIds.includes(todo.id)));
       })
       .finally(() => {
-        setTodosInProgress([]);
+        setTodoIdsInProgress([]);
       });
-  };
+  }, [data, setTodoIdsInProgress, setErrorMessage, setData]);
 
-  const updateTodo = (updatedTodo: Todo) => {
-    setTodosInProgress(current => [...current, updatedTodo.id]);
+  // #endregion
 
-    return todoService
-      .updateTodos(updatedTodo)
-      .then(todo => {
-        setData(currentData => {
-          const newData = [...currentData];
-          const index = newData.findIndex(tod => tod.id === updatedTodo.id);
+  // #region updateTodo
+  const updateTodo = useCallback(
+    (updatedTodo: Todo) => {
+      setTodoIdsInProgress(current => [...current, updatedTodo.id]);
 
-          newData.splice(index, 1, todo);
-
-          return newData;
+      return todoService
+        .updateTodos(updatedTodo)
+        .then(todo => {
+          setData(currentData =>
+            currentData.map(currentTodo =>
+              currentTodo.id === updatedTodo.id ? todo : currentTodo,
+            ),
+          );
+        })
+        .catch(() => {
+          setErrorMessage(TodoServiceErrors.UnableToUpdate);
+          throw new Error(TodoServiceErrors.UnableToUpdate);
+        })
+        .finally(() => {
+          setTodoIdsInProgress(current =>
+            current.filter(id => id !== updatedTodo.id),
+          );
         });
-      })
-      .catch(() => {
-        setErrorMessage(TodoServiceErrors.UnableToUpdate);
-        throw new Error(TodoServiceErrors.UnableToUpdate);
-      })
-      .finally(() => {
-        setTodosInProgress([]);
-      });
-  };
+    },
+    [setData, setErrorMessage, setTodoIdsInProgress],
+  );
 
-  const toggleTodos = () => {
+  // #endregion
+
+  // #region toggleTodos
+  const toggleTodos = useCallback(() => {
     const todosToToggle = hasActiveTodos
       ? data.filter(todo => !todo.completed)
       : data;
 
     const toggledIds = todosToToggle.map(todo => todo.id);
 
-    setTodosInProgress(toggledIds);
+    setTodoIdsInProgress(prev => [...prev, ...toggledIds]);
 
     return Promise.allSettled(
-      todosToToggle.map(
-        todo =>
-          todoService
-            .updateTodos({ ...todo, completed: !todo.completed })
-            .then(() => ({ ...todo, completed: !todo.completed })), // <--- тут
+      todosToToggle.map(todo =>
+        todoService
+          .updateTodos({ ...todo, completed: !todo.completed })
+          .then(() => ({ ...todo, completed: !todo.completed })),
       ),
     )
       .then(results => {
@@ -144,38 +157,44 @@ export function useTodo() {
         );
       })
       .finally(() => {
-        setTodosInProgress([]);
+        setTodoIdsInProgress(prev =>
+          prev.filter(id => !toggledIds.includes(id)),
+        );
       });
-  };
+  }, [data, hasActiveTodos, setData, setTodoIdsInProgress, setErrorMessage]);
+  // #endregion
 
-  const addTodo = (newTodo: Omit<Todo, 'id'>) => {
-    const tTodo: Todo = {
-      id: 0,
-      userId: todoService.USER_ID,
-      title: newTodo.title,
-      completed: false,
-    };
+  // #region addTodo
+  const addTodo = useCallback(
+    (newTodo: Omit<Todo, 'id'>) => {
+      const tTodo: Todo = {
+        id: 0,
+        userId: todoService.USER_ID,
+        title: newTodo.title,
+        completed: false,
+      };
 
-    setTempTodo(tTodo);
-    setTodosInProgress([tTodo.id]);
+      setTempTodo(tTodo);
 
-    return todoService
-      .createTodos(newTodo)
-      .then(todoFromServer => {
-        setData(prev => [...prev, todoFromServer]);
-      })
-      .finally(() => {
-        setTempTodo(null);
-        setTodosInProgress([]);
-      });
-  };
+      return todoService
+        .createTodos(newTodo)
+        .then(todoFromServer => {
+          setData(prev => [...prev, todoFromServer]);
+        })
+        .finally(() => {
+          setTempTodo(null);
+        });
+    },
+    [setTempTodo, setData],
+  );
+  // #endregion
 
   return {
     data,
     isLoading,
     errorMessage,
     tempTodo,
-    todosInProgress,
+    todoIdsInProgress,
     hasCompletedTodos,
     hasActiveTodos,
     setErrorMessage,
@@ -184,5 +203,9 @@ export function useTodo() {
     deleteCompletedTodos,
     updateTodo,
     toggleTodos,
+    visibleTodos,
+    filter,
+    setFilter,
+    countOfActiveTodos,
   };
 }

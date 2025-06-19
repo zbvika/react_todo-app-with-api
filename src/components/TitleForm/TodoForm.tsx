@@ -6,14 +6,14 @@ import React, {
 } from 'react';
 import { Todo } from '../../types/Todo';
 import * as todoService from '../../api/todos';
-import { TodoServiceErrors } from '../../types/Errors';
+import { TodoServiceErrors, TodoServiceErrorsValues } from '../../types/Errors';
 
 interface Props {
   onSubmit: (todo: Omit<Todo, 'id'>) => Promise<void>;
-  setErrorMessage: (error: string | null) => void;
+  setErrorMessage: (error: TodoServiceErrorsValues | null) => void;
 }
 
-export const TitleForm = forwardRef<HTMLInputElement, Props>(
+export const TodoForm = forwardRef<HTMLInputElement, Props>(
   ({ onSubmit, setErrorMessage }, ref) => {
     const [title, setTitle] = useState('');
     const focusRef = useRef<HTMLInputElement>(null);
@@ -75,4 +75,4 @@ export const TitleForm = forwardRef<HTMLInputElement, Props>(
   },
 );
 
-TitleForm.displayName = 'TitleForm';
+TodoForm.displayName = 'TitleForm';
